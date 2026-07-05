@@ -1,0 +1,17 @@
+**/.env
+**/.env.*
+.env
+.env.*
+node_modules
+**/node_modules
+.git
+.gitignore
+*.md
+**/dist
+**/.turbo
+.vscode
+secrets
+.next
+**/.next
+**/README.md
+README.md
