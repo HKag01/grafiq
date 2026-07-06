@@ -1,84 +1,104 @@
-# Turborepo starter
+# Grafiq
 
-This Turborepo starter is maintained by the Turborepo core team.
+An Excalidraw-style collaborative whiteboard, built from scratch. Custom canvas rendering engine, no drawing libraries, real-time multiplayer over WebSockets.
 
-## Using this example
+**[Try it live](https://grafiq.hrdk.dev)** — open it in two tabs side by side and draw.
 
-Run the following command:
+<!-- Record a 10-15 second GIF of two windows syncing, save it as demo.gif in the repo root, then uncomment this line: -->
+<!-- ![Two clients drawing on the same canvas in real time](./demo.gif) -->
 
-```sh
-npx create-turbo@latest
-```
+## Features
 
-## What's inside?
+- **Real-time collaboration:** multiple users draw on the same canvas and every change syncs live to everyone in the room
+- **Vector shapes:** rectangles, ellipses, lines, freehand strokes and text — all selectable and movable after they're drawn
+- **Infinite canvas:** pan and zoom anywhere; your view (pan + zoom) is remembered between sessions
+- **Share by link:** send a URL and your collaborator lands directly on your canvas
+- **Persistent canvases:** boards are saved server-side, so you can close the tab and pick up where you left off
+- **Auth:** sign up / sign in with JWT-based sessions stored in an httpOnly cookie
 
-This Turborepo includes the following packages/apps:
+## How it works
 
-### Apps and Packages
+### The rendering engine
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+There is no Excalidraw, Konva, Fabric or any other canvas library in this repo. Everything on the board is drawn directly with the HTML5 Canvas 2D API.
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+- Every shape is a plain object in an in-memory scene: type, geometry, style
+- On any change the engine clears the canvas and repaints every shape from that list — a straightforward full-scene redraw
+- Pointer coordinates run through a viewport transform (`pan` + `scale`), which is what keeps drawing, panning, zooming and hit-testing (clicking a shape to select it) accurate at any zoom level
 
-### Utilities
+Writing this by hand instead of importing a library was the point. It forced me to actually understand coordinate systems, hit detection and the redraw loop instead of calling someone else's `draw()`.
 
-This Turborepo has some additional tools already setup for you:
+### Real-time sync
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+- A WebSocket server keeps a room per canvas
+- Drawing actions travel as small per-shape operations — create, update, delete — each carrying a single serialized shape, never a full-canvas snapshot, so messages stay tiny
+- Your own strokes render optimistically the instant you draw. The network round trip only affects when _others_ see them, which lands well under 100ms on a normal connection
+- Every operation is persisted server-side in PostgreSQL (via Prisma), so a canvas survives everyone disconnecting and reloads from history
 
-### Build
+Conflict handling is deliberately simple: last write wins per shape. On a whiteboard two people almost never edit the same shape in the same instant, so CRDT-level machinery would be complexity without payoff at this scale.
 
-To build all apps and packages, run the following command:
+### Monorepo layout
 
-```
-cd my-turborepo
-pnpm build
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
+Turborepo workspace:
 
 ```
-cd my-turborepo
+apps/
+  grafiq-frontend   # Next.js frontend + the canvas rendering engine
+  http-backend      # Express REST API — auth, rooms, persistence
+  ws-backend        # WebSocket server — real-time room sync
+packages/
+  db                # Prisma schema + client (PostgreSQL)
+  fullstack-common  # shared types used by client and both servers
+  ui                # shared React components
+```
+
+Shared TypeScript types in `fullstack-common` mean a drawing operation is defined once and used on the client, the REST API and the socket server alike.
+
+## Stack
+
+TypeScript, Next.js, raw Canvas 2D, WebSockets (`ws`), Express, PostgreSQL + Prisma, JWT auth, Turborepo, pnpm.
+
+## Running locally
+
+```bash
+git clone https://github.com/HKag01/grafiq
+cd grafiq
+pnpm install
+
+# create your .env (see below), then generate the Prisma client
+pnpm db:generate
+
 pnpm dev
 ```
 
-### Remote Caching
+You'll need a **PostgreSQL** database — a free [Neon](https://neon.tech) instance works out of the box. Create a `.env` at the repo root with:
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+```bash
+DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
+JWT_SECRET=your-strong-secret
+EXP_TIME=12h
 
-Turborepo can use a technique known as [Remote Caching](https://turbo.build/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+# server-side URLs
+HTTP_URL=http://localhost:3001
+WS_URL=ws://localhost:8080
+FE_URL=http://localhost:3000
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+# baked into the frontend at build time
+NEXT_PUBLIC_HTTP_URL=http://localhost:3001
+NEXT_PUBLIC_WS_URL=ws://localhost:8080
+NEXT_PUBLIC_FE_URL=http://localhost:3000
 
-```
-cd my-turborepo
-npx turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-npx turbo link
+WEBSOCKET_PORT=8080
 ```
 
-## Useful Links
+Ports: frontend on `:3000`, REST API on `:3001`, WebSocket server on `:8080`.
 
-Learn more about the power of Turborepo:
+## Roadmap
 
-- [Tasks](https://turbo.build/docs/core-concepts/monorepos/running-tasks)
-- [Caching](https://turbo.build/docs/core-concepts/caching)
-- [Remote Caching](https://turbo.build/docs/core-concepts/remote-caching)
-- [Filtering](https://turbo.build/docs/core-concepts/monorepos/filtering)
-- [Configuration Options](https://turbo.build/docs/reference/configuration)
-- [CLI Usage](https://turbo.build/docs/reference/command-line-reference)
+- Live cursors with user presence
+- Undo/redo that plays nicely with multiplayer
+- Export to PNG/SVG
+
+---
+
+Built by **Hardik Agarwal** · [Portfolio](https://portfolio.hrdk.dev) · [LinkedIn](https://www.linkedin.com/in/hkag01/) · [GitHub](https://github.com/HKag01)

@@ -59,17 +59,7 @@ export default function NavBar() {
 				{/*Sign-In Side*/}
 				<div className="flex flex-row gap-5 justify-center items-center">
 					{/*Github and Discord Logos */}
-					<a href="https://discord.gg/EPcJrBmjUW">
-						<button className="p-2 rounded-2xl hover:bg-[#b59fc45c] cursor-pointer">
-							<Image
-								src="/discord.svg"
-								alt="github"
-								width={38}
-								height={38}
-								draggable="false"
-							/>
-						</button>
-					</a>
+
 					<a href="https://github.com/hkag01/Grafiq">
 						<button className="p-2 rounded-2xl hover:bg-[#b59fc45c] cursor-pointer">
 							<Image
