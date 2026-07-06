@@ -40,6 +40,10 @@ const app = express();
 
 app.use(helmet());
 app.use(json());
+app.use((req, res, next) => {
+	console.log(req.url);
+	next();
+});
 app.use(cookieParser());
 app.use(
 	cors({
@@ -47,7 +51,7 @@ app.use(
 		credentials: true,
 		methods: ["GET", "POST"],
 		allowedHeaders: ["Content-Type", "Authorization"],
-	})
+	}),
 );
 
 app.use(passport.initialize());
@@ -125,6 +129,7 @@ app.post("/api/v1/auth/signup", async (req, res) => {
 			message: "Successful Registration!",
 		});
 	} catch (error) {
+		console.log(error);
 		res.status(500).json({ message: "Internal Server Error!" });
 	}
 });
@@ -163,7 +168,7 @@ app.post("/api/v1/auth/signin", async (req, res) => {
 		//If password is valid
 		const isPasswordValid = await bcrypt.compare(
 			result.data.password,
-			userData.password
+			userData.password,
 		);
 		if (!isPasswordValid) {
 			res.status(400).json({ message: "Incorrect Password!" });
@@ -174,13 +179,14 @@ app.post("/api/v1/auth/signin", async (req, res) => {
 		const token = jwt.sign(
 			{ userId: userData.id, nfl: userData.name[0] },
 			JWT_SECRET!,
-			{ expiresIn: EXP_TIME } as jwt.SignOptions
+			{ expiresIn: EXP_TIME } as jwt.SignOptions,
 		);
 		res
 			.status(200)
 			.cookie("__uIt", token, cookieConfig)
 			.json({ message: "Successful Login!", name: userData.name });
 	} catch (error) {
+		console.log(error);
 		res.status(500).json({ message: "Internal Server Error!" });
 	}
 });
@@ -508,7 +514,7 @@ app.post(
 			console.log(error);
 			res.status(500).json({ message: "Internal Server Error", err: error });
 		}
-	}
+	},
 );
 
 // Get room related chats by room Id
@@ -531,6 +537,7 @@ app.get("/api/v1/user/chats/:roomId", authenticator, async (req, res) => {
 
 		res.status(200).json({ messages });
 	} catch (error) {
+		console.log(error);
 		res.status(500).json({ message: "Internal Server Error!" });
 	}
 });
@@ -559,10 +566,11 @@ app.get(
 			// console.log(nfl);
 			res.status(200).json({ rooms: rooms, nfl: nfl });
 		} catch (error) {
-			// console.log("DB failure!");
+			console.log("DB failure!");
+			console.log(error);
 			res.status(500).json({ message: "Internal Server Error!" });
 		}
-	}
+	},
 );
 
 // Check Authorization status
@@ -620,7 +628,8 @@ app.post("/api/v1/auth/signout", (req: Request, res: Response) => {
 			.status(200)
 			.clearCookie("__uIt", cookieConfig)
 			.json({ flag: true, message: "Logout Successfully" });
-	} catch {
+	} catch (error) {
+		console.log(error);
 		res.status(500).json({ flag: false, message: "Internal Server Error!" });
 	}
 });

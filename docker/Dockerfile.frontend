@@ -21,7 +21,7 @@ COPY ./packages/typescript-config ./packages/typescript-config
 COPY ./packages/fullstack-common/package.json ./packages/fullstack-common/package.json
 COPY ./packages/fullstack-common/tsconfig.json ./packages/fullstack-common/tsconfig.json
 
-COPY ./apps/doodleart-frontend ./apps/doodleart-frontend
+COPY ./apps/grafiq-frontend ./apps/grafiq-frontend
 
 RUN pnpm install --frozen-lockfile
 
@@ -47,13 +47,13 @@ COPY ./packages/typescript-config ./packages/typescript-config
 
 COPY ./packages/fullstack-common/package.json ./packages/fullstack-common/package.json
 
-COPY ./apps/doodleart-frontend/package.json ./apps/doodleart-frontend/package.json
+COPY ./apps/grafiq-frontend/package.json ./apps/grafiq-frontend/package.json
 
 RUN pnpm install --prod --frozen-lockfile
 
 COPY ./packages/fullstack-common/src ./packages/fullstack-common/src
-COPY --from=builder /app/apps/doodleart-frontend/.next ./apps/doodleart-frontend/.next
-COPY --from=builder /app/apps/doodleart-frontend/public ./apps/doodleart-frontend/public
+COPY --from=builder /app/apps/grafiq-frontend/.next ./apps/grafiq-frontend/.next
+COPY --from=builder /app/apps/grafiq-frontend/public ./apps/grafiq-frontend/public
 
 EXPOSE 3000
 
