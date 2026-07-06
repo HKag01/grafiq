@@ -33,7 +33,7 @@ const cookieConfig = {
 	sameSite: "lax" as const,
 	path: "/",
 	maxAge: 1000 * 60 * 60 * 24 * 4,
-	...(isProd && { domain: ".Grafiq.com" }), // only set domain in prod
+	...(isProd && { domain: process.env.COOKIE_DOMAIN }), // only set domain in prod
 };
 
 const app = express();
@@ -47,7 +47,11 @@ app.use((req, res, next) => {
 app.use(cookieParser());
 app.use(
 	cors({
-		origin: ["https://Grafiq.com", "http://localhost:3000"], // Your frontend URL
+		origin: [
+			"https://Grafiq.com",
+			"http://localhost:3000",
+			process.env.FE_URL ? process.env.FE_URL : "",
+		], // Your frontend URL
 		credentials: true,
 		methods: ["GET", "POST"],
 		allowedHeaders: ["Content-Type", "Authorization"],
