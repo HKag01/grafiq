@@ -13,8 +13,6 @@ import cors from "cors";
 import helmet from "helmet";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { Strategy as FacebookStrategy } from "passport-facebook";
-import { Strategy as GithubStrategy } from "passport-github2";
 import env from "dotenv";
 
 env.config();
@@ -195,288 +193,87 @@ app.post("/api/v1/auth/signin", async (req, res) => {
 	}
 });
 
-// // 🔒 Google OAuth endpoints
-// // ------------------------------------------------------------------------------------------------------------------------------
-// app.get(
-// 	"/api/v1/auth/google",
-// 	passport.authenticate("google", { scope: ["profile", "email"] })
-// );
+// 🔒 Google OAuth (sign-in / sign-up)
+// ------------------------------------------------------------------------------------------------------------------------------
+passport.use(
+	new GoogleStrategy(
+		{
+			clientID: process.env.GOOGLE_CLIENT_ID!,
+			clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+			callbackURL: `${HTTP_URL}/auth/google/return`,
+			scope: ["profile", "email"],
+		},
+		async (_accessToken, _refreshToken, profile, done) => {
+			try {
+				const userEmail = profile.emails && profile.emails[0]?.value;
+				if (!userEmail) {
+					return done(new Error("No email found in Google profile"), undefined);
+				}
 
-// passport.use(
-// 	new GoogleStrategy(
-// 		{
-// 			clientID: process.env.GOOGLE_CLIENT_ID!,
-// 			clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-// 			callbackURL: `${HTTP_URL}/auth/google/return`,
-// 			scope: ["profile", "email"],
-// 		},
-// 		async (accessToken, refreshToken, profile, done) => {
-// 			try {
-// 				// Check if user exists in database
-// 				const userEmail = profile.emails && profile.emails[0]?.value;
+				let user = await db.user.findUnique({
+					where: { email: userEmail },
+				});
 
-// 				if (!userEmail) {
-// 					return done(new Error("No email found in Google profile"), undefined);
-// 				}
+				if (!user) {
+					// First Google sign-in for this email: create the account
+					user = await db.user.create({
+						data: {
+							email: userEmail,
+							name: profile.displayName || "Google User",
+							password: await bcrypt.hash(
+								Math.random().toString(36).slice(-10),
+								10,
+							),
+							googleId: profile.id,
+							photo: profile.photos?.[0]?.value,
+						},
+					});
+				} else if (!user.googleId) {
+					// Existing email/password account: link the Google id
+					user = await db.user.update({
+						where: { id: user.id },
+						data: { googleId: profile.id },
+					});
+				}
 
-// 				let user = await db.user.findUnique({
-// 					where: {
-// 						email: userEmail,
-// 					},
-// 				});
+				return done(null, { id: user.id, email: user.email, nfl: user.name[0] });
+			} catch (error) {
+				return done(error as Error, undefined);
+			}
+		},
+	),
+);
 
-// 				if (!user) {
-// 					// Create new user if they don't exist
-// 					user = await db.user.create({
-// 						data: {
-// 							email: userEmail,
-// 							name: profile.displayName || "Google User",
-// 							password: await bcrypt.hash(
-// 								Math.random().toString(36).slice(-10),
-// 								10
-// 							),
-// 							googleId: profile.id,
-// 						},
-// 					});
-// 				} else if (!user.googleId) {
-// 					// If user exists but doesn't have googleId, update their record
-// 					user = await db.user.update({
-// 						where: { id: user.id },
-// 						data: { googleId: profile.id },
-// 					});
-// 				}
+// Step 1: send the user to Google's consent screen
+app.get(
+	"/api/v1/auth/google",
+	passport.authenticate("google", { scope: ["profile", "email"] }),
+);
 
-// 				return done(null, {
-// 					id: user.id,
-// 					email: user.email,
-// 					nfl: user.name[0],
-// 				});
-// 			} catch (error) {
-// 				return done(error, undefined);
-// 			}
-// 		}
-// 	)
-// );
-
-// app.get(
-// 	"/auth/google/return",
-// 	(req, res, next) => {
-// 		if (req.query.error) {
-// 			return res.redirect(`${FE_URL}/signin`);
-// 		}
-// 		passport.authenticate("google", {
-// 			session: false,
-// 			failureRedirect: `${FE_URL}/signin`,
-// 		})(req, res, next);
-// 	},
-// 	(req, res) => {
-// 		try {
-// 			const user = req.user as { id: string; email: string; nfl: string };
-// 			const token = jwt.sign({ userId: user.id, nfl: user.nfl }, JWT_SECRET!, {
-// 				expiresIn: EXP_TIME,
-// 			} as jwt.SignOptions);
-// 			res.cookie("__uIt", token, cookieConfig);
-
-// 			// ✅ Redirect to frontend
-// 			res.redirect(`${FE_URL}/dashboard`);
-// 		} catch (error) {
-// 			res.redirect(`${FE_URL}/signin`);
-// 		}
-// 	}
-// );
-
-// // 🔒 Facebook Authentication endpoints
-// // -------------------------------------------------------------------------------------------------------------------------------
-// app.get(
-// 	"/api/v1/auth/facebook",
-// 	passport.authenticate("facebook", { scope: ["email"] })
-// );
-
-// passport.use(
-// 	new FacebookStrategy(
-// 		{
-// 			clientID: process.env.FACEBOOK_APP_ID!,
-// 			clientSecret: process.env.FACEBOOK_APP_SECRET!,
-// 			callbackURL: `${HTTP_URL}/auth/facebook/return`,
-// 			profileFields: ["id", "displayName", "photos", "email"], // Request email permission
-// 		},
-// 		async (accessToken, refreshToken, profile, done) => {
-// 			try {
-// 				// Get email from profile (Facebook might not always provide email)
-// 				const userEmail = profile.emails && profile.emails[0]?.value;
-
-// 				if (!userEmail) {
-// 					return done(
-// 						new Error("No email found in Facebook profile"),
-// 						undefined
-// 					);
-// 				}
-
-// 				let user = await db.user.findUnique({
-// 					where: {
-// 						email: userEmail,
-// 					},
-// 				});
-
-// 				if (!user) {
-// 					// Create new user if they don't exist
-// 					user = await db.user.create({
-// 						data: {
-// 							email: userEmail,
-// 							name: profile.displayName || "Facebook User",
-// 							password: await bcrypt.hash(
-// 								Math.random().toString(36).slice(-10),
-// 								10
-// 							),
-// 							facebookId: profile.id, // You'll need to add this field to your User model
-// 						},
-// 					});
-// 				} else if (!user.facebookId) {
-// 					// If user exists but doesn't have facebookId, update their record
-// 					user = await db.user.update({
-// 						where: { id: user.id },
-// 						data: { facebookId: profile.id },
-// 					});
-// 				}
-
-// 				return done(null, {
-// 					id: user.id,
-// 					email: user.email,
-// 					nfl: user.name[0],
-// 				});
-// 			} catch (error) {
-// 				return done(error, undefined);
-// 			}
-// 		}
-// 	)
-// );
-
-// app.get(
-// 	"/auth/facebook/return",
-// 	(req, res, next) => {
-// 		// Check if Facebook returned an error (user denied permission)
-// 		if (req.query.error) {
-// 			return res.redirect(`${FE_URL}/signin`);
-// 		}
-
-// 		// Continue with normal authentication
-// 		passport.authenticate("facebook", {
-// 			session: false,
-// 			failureRedirect: `${FE_URL}/signin`,
-// 		})(req, res, next);
-// 	},
-// 	(req, res) => {
-// 		try {
-// 			const user = req.user as { id: string; email: string; nfl: string };
-// 			const token = jwt.sign({ userId: user.id, nfl: user.nfl }, JWT_SECRET!, {
-// 				expiresIn: EXP_TIME,
-// 			} as jwt.SignOptions);
-// 			res.cookie("__uIt", token, cookieConfig);
-
-// 			res.redirect(`${FE_URL}/dashboard`);
-// 		} catch (error) {
-// 			res.redirect(`${FE_URL}/signin`);
-// 		}
-// 	}
-// );
-
-// // 🔒 Github Authentication endpoints
-// // -------------------------------------------------------------------------------------------------------------------------------
-// app.get(
-// 	"/api/v1/auth/github",
-// 	passport.authenticate("github", { scope: ["user:email"] })
-// );
-
-// passport.use(
-// 	new GithubStrategy(
-// 		{
-// 			clientID: process.env.GITHUB_CLIENT_ID!,
-// 			clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-// 			callbackURL: `${HTTP_URL}/auth/github/return`,
-// 			scope: ["user:email"], // Request email access
-// 		},
-// 		async (
-// 			accessToken: string,
-// 			refreshToken: string,
-// 			profile: any,
-// 			done: any
-// 		) => {
-// 			try {
-// 				// GitHub might not provide email in the main profile, so we need to fetch it
-// 				let userEmail = profile.emails && profile.emails[0]?.value;
-
-// 				// If no email in profile, we might need to fetch it separately using the access token
-// 				if (!userEmail && profile._json.email) {
-// 					userEmail = profile._json.email;
-// 				}
-
-// 				if (!userEmail) {
-// 					return done(new Error("No email found in GitHub profile"), undefined);
-// 				}
-
-// 				let user = await db.user.findUnique({
-// 					where: {
-// 						email: userEmail,
-// 					},
-// 				});
-
-// 				if (!user) {
-// 					// Create new user if they don't exist
-// 					user = await db.user.create({
-// 						data: {
-// 							email: userEmail,
-// 							name: profile.displayName || profile.username || "GitHub User",
-// 							password: await bcrypt.hash(
-// 								Math.random().toString(36).slice(-10),
-// 								10
-// 							),
-// 							githubId: profile.id, // You'll need to add this field to your User model
-// 						},
-// 					});
-// 				} else if (!user.githubId) {
-// 					// If user exists but doesn't have githubId, update their record
-// 					user = await db.user.update({
-// 						where: { id: user.id },
-// 						data: { githubId: profile.id },
-// 					});
-// 				}
-
-// 				return done(null, {
-// 					id: user.id,
-// 					email: user.email,
-// 					nfl: user.name[0],
-// 				});
-// 			} catch (error) {
-// 				return done(error, undefined);
-// 			}
-// 		}
-// 	)
-// );
-
-// app.get(
-// 	"/auth/github/return",
-// 	(req, res, next) => {
-// 		if (req.query.error) {
-// 			return res.redirect(`${FE_URL}/signin`);
-// 		}
-// 		passport.authenticate("github", {
-// 			session: false,
-// 			failureRedirect: `${FE_URL}/signin`,
-// 		})(req, res, next);
-// 	},
-// 	(req, res) => {
-// 		try {
-// 			const user = req.user as { id: string; email: string; nfl: string };
-// 			const token = jwt.sign({ userId: user.id, nfl: user.nfl }, JWT_SECRET!, {
-// 				expiresIn: EXP_TIME,
-// 			} as jwt.SignOptions);
-// 			res.cookie("__uIt", token, cookieConfig);
-// 			res.redirect(`${FE_URL}/dashboard`);
-// 		} catch (error) {
-// 			res.redirect(`${FE_URL}/signin`);
-// 		}
-// 	}
-// );
+// Step 2: Google redirects back here — mint our JWT cookie and bounce to the app
+app.get(
+	"/auth/google/return",
+	(req, res, next) => {
+		if (req.query.error) {
+			return res.redirect(`${FE_URL}/signin`);
+		}
+		passport.authenticate("google", {
+			session: false,
+			failureRedirect: `${FE_URL}/signin`,
+		})(req, res, next);
+	},
+	(req, res) => {
+		try {
+			const user = req.user as { id: string; email: string; nfl: string };
+			const token = jwt.sign({ userId: user.id, nfl: user.nfl }, JWT_SECRET!, {
+				expiresIn: EXP_TIME,
+			} as jwt.SignOptions);
+			res.cookie("__uIt", token, cookieConfig).redirect(`${FE_URL}/dashboard`);
+		} catch (error) {
+			res.redirect(`${FE_URL}/signin`);
+		}
+	},
+);
 
 // 📝 CRUD Related Endpoints
 //----------------------------------------------------------------

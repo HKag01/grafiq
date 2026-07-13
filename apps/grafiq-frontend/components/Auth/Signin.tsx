@@ -37,7 +37,7 @@ export function SignIn() {
 				form,
 				{
 					withCredentials: true,
-				}
+				},
 			);
 			console.log(response.data);
 			router.push("/dashboard");
@@ -73,47 +73,19 @@ export function SignIn() {
 
 				{/* Main Form Body */}
 				<div className="flex flex-col items-center gap-5 w-full">
-					{/* Google, Github and facebook buttons */}
-					<div className="flex flex-row gap-5">
-						<a href={`${HTTP_URL}/api/v1/auth/google`}>
-							<button className="w-22 md:w-25 lg:w-30 h-13 border border-gray-400 rounded-lg hover:border-[#d08fff] flex items-center justify-center">
-								<Image
-									src="/google.svg"
-									alt="google"
-									width={30}
-									height={30}
-									className="object-contain"
-									draggable="false"
-								/>
-							</button>
-						</a>
-
-						<a href={`${HTTP_URL}/api/v1/auth/github`}>
-							<button className="w-22 md:w-25 lg:w-30 h-13 border border-gray-400 rounded-lg hover:border-[#d08fff] flex items-center justify-center">
-								<Image
-									src="/github2.svg"
-									alt="github"
-									width={30}
-									height={30}
-									className="object-contain"
-									draggable="false"
-								/>
-							</button>
-						</a>
-
-						<a href={`${HTTP_URL}/api/v1/auth/facebook`}>
-							<button className="w-22 md:w-25 lg:w-30 h-13 border border-gray-400 rounded-lg hover:border-[#d08fff] flex items-center justify-center">
-								<Image
-									src="/facebook.svg"
-									alt="facebook"
-									width={30}
-									height={30}
-									className="object-contain"
-									draggable="false"
-								/>
-							</button>
-						</a>
-					</div>
+					<a href={`${HTTP_URL}/api/v1/auth/google`} className="w-full">
+						<button className="w-full h-13 border border-gray-400 rounded-lg hover:border-[#d08fff] flex items-center justify-center gap-3 text-white">
+							<Image
+								src="/google.svg"
+								alt="google"
+								width={26}
+								height={26}
+								className="object-contain"
+								draggable="false"
+							/>
+							<span className="font-semibold">Continue with Google</span>
+						</button>
+					</a>
 
 					{/* __or__ */}
 					<div className="flex items-center gap-4 text-gray-400 my-2">
